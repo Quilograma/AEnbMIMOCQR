@@ -3,24 +3,26 @@ from EnbPI import EnbPI
 import numpy as np
 import pandas as pd
 from EnCQR import EnCQR
-from MIMONaive import MIMONaive
 from MIMOCQR import MIMOCQR
+from AEnbMIMOCQR import AEnbMIMOCQR
 from AutoArima import auto_arima
 import warnings
 warnings.filterwarnings("ignore")
 
-def train_cal_val_split(X,y):
+def train_val_split(X,y):
     N=X.shape[0]
     ntrain=int(N/2)
-    ncal=int((N-ntrain)/2)
-    nval=N-ntrain-ncal
+    nval=N-ntrain
 
-    X_train,y_train,X_cal,y_cal,X_val,y_val=X[:ntrain],y[:ntrain],X[ntrain:ntrain+ncal],y[ntrain:ntrain+ncal],X[-nval:],y[-nval:]
+    X_train,y_train,X_val,y_val=X[:ntrain],y[:ntrain],X[-nval:],y[-nval:]
 
-    return X_train,y_train,X_cal,y_cal,X_val,y_val
+    return X_train,y_train,X_val,y_val
 
 def phi(arr):
     return np.mean(arr)
+
+def phimulti(arr):
+    return np.mean(arr,axis=1)
 
 def to_supervised(timeseries,n_lags,n_output=1):
     
@@ -83,34 +85,48 @@ if __name__=='__main__':
     for col in cols:
         print(col)
         
-        ts=normalize(data[col].values)
-        arima=auto_arima(ts[:-H],ts[-H:],timesteps,H,alpha)
-        results=arima.calculate_metrics()
-        aux5.append([results[0],results[1][0],results[1][1]])
+        #ts=normalize(data[col].values)
+        #arima=auto_arima(ts[:-H],ts[-H:],timesteps,H,alpha)
+        #results=arima.calculate_metrics()
+        #aux5.append([results[0],results[1][0],results[1][1]])
 
         X,y=to_supervised(normalize(data[col].values),n_lags=timesteps,n_output=H)
-        X_train,y_train,X_cal,y_cal,X_val,y_val=train_cal_val_split(X,y)
-        mimonaive=MIMONaive(X_train,y_train,X_cal,y_cal,X_val,y_val,alpha)
-        results=mimonaive.calculate_coverage()
-        aux1.append([results[0],results[2][0],results[2][1]])
-        mimocqr=MIMOCQR(X_train,y_train,X_cal,y_cal,X_val,y_val,100,alpha)
+        X_train,y_train,X_val,y_val=train_val_split(X,y)
+
+        S_b=np.random.choice(X_train.shape[0],X_train.shape[0])
+        X_train_resampled,y_train_resampled=X_train[S_b],y_train[S_b]
+        n_S_B=[]
+        for i in range(X_train.shape[0]):
+            if i not in S_b:
+                n_S_B.append(i)
+        n_S_B=np.array(n_S_B)
+
+        mimocqr=MIMOCQR(X_train_resampled,y_train_resampled,X_train[n_S_B],y_train[n_S_B],X_val,y_val,1000,100,alpha)
         results=mimocqr.calculate_coverage()
+        print(results)
+        aux1.append([results[0],results[2][0],results[2][1]])
+        aenbmimocqr=AEnbMIMOCQR(X_train,y_train,X_val,y_val,1,alpha,phi,1000,100)
+        results=aenbmimocqr.calculate_coverage()
+        print(results)
         aux2.append([results[0],results[2][0],results[2][1]])
 
         X_rec,y_rec=to_supervised(normalize(data[col].values),n_lags=timesteps,n_output=1)
-        X_train_rec,y_train_rec,X_test_rec,y_test_rec=X_rec[:-H],y_rec[:-H],X_rec[-H:],y_rec[-H:]
-        enbpi=EnbPI(10,alpha,1,X_train_rec,y_train_rec,X_test_rec,y_test_rec,timesteps,H,phi)
+        X_train,y_train,X_val,y_val=train_val_split(X_rec,y_rec)
+
+        enbpi=EnbPI(1,alpha,30,X_train,y_train,X_val,y_val,timesteps,phi)
         conf_PIs=enbpi.Conf_PIs()
-        results=summary_coverage_widths(conf_PIs,y_test_rec)
+        results=summary_coverage_widths(conf_PIs,y_val)
+        print(results)
         aux3.append([results[0],results[1][0],results[1][1]])
-        encqr=EnCQR(10,alpha,1,X_train_rec,y_train_rec,X_test_rec,y_test_rec,timesteps,H,phi)
+        encqr=EnCQR(1,alpha,30,X_train,y_train,X_val,y_val,timesteps,phi,1000,100)
         conf_PIs=encqr.Conf_PIs()
-        results=summary_coverage_widths(conf_PIs,y_test_rec)
+        results=summary_coverage_widths(conf_PIs,y_val)
+        print(results)
         aux4.append([results[0],results[1][0],results[1][1]])
         
 
         lst_results=[]
-        lst_results.append(np.median(aux5,axis=0))
+        #lst_results.append(np.median(aux5,axis=0))
         lst_results.append(np.median(aux1,axis=0))
         lst_results.append(np.median(aux2,axis=0))
         lst_results.append(np.median(aux3,axis=0))

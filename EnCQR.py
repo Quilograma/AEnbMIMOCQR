@@ -45,7 +45,7 @@ class EnCQR:
     residuals_list=[] # list to store non-conformity scores
     S_b_list=[] # indexes list
 
-    def __init__(self, B,alpha,s,X_train,y_train,X_test,y_test,timesteps,H,phi):
+    def __init__(self, B,alpha,s,X_train,y_train,X_test,y_test,timesteps,phi,epochs,batch_size):
         self.B=B
         self.alpha=alpha
         self.s=s
@@ -54,8 +54,9 @@ class EnCQR:
         self.X_test=X_test
         self.y_test=y_test
         self.phi=phi
-        self.H=H
         self.timesteps=timesteps
+        self.epochs=epochs
+        self.batch_size=batch_size
     
     def Bootstrap_fit(self):
         N=self.X_train.shape[0]
@@ -64,7 +65,7 @@ class EnCQR:
             S_b=np.random.choice(N,N)
             X_train_resampled,y_train_resampled=self.X_train[S_b],self.y_train[S_b]
             model=QuantileRegressionModel(X_train_resampled.shape[1],y_train_resampled.shape[1],qs=[self.alpha/2,0.5,1-self.alpha/2])
-            model.fit(X_train_resampled,y_train_resampled,epochs=100,batch_size=50,verbose=0)
+            model.fit(X_train_resampled,y_train_resampled,epochs=100,batch_size=100,verbose=0)
             self.S_b_list.append(S_b)
             self.models_list.append(model)
             
@@ -86,7 +87,7 @@ class EnCQR:
             actual_value=self.y_train[i]
             
             if counter>0:
-                self.residuals_list.append([self.phi(forecast_lower)-actual_value,actual_value-self.phi(forecast_upper)])
+                self.residuals_list.append(max(self.phi(forecast_lower)-actual_value,actual_value-self.phi(forecast_upper)))
 
         return self.residuals_list
 
@@ -125,15 +126,13 @@ class EnCQR:
             ensemble_forecast_upper=self.phi(forecast_upper)
             forecasts.append(ensemble_forecast)
 
-            q_yhat_lower=np.quantile(np.array(self.residuals_list)[:,0],np.floor((N+1)*(1-self.alpha))/N)
-            q_yhat_upper=np.quantile(np.array(self.residuals_list)[:,1],np.floor((N+1)*(1-self.alpha))/N)
+            q_yhat=np.quantile(np.array(self.residuals_list),np.floor((N+1)*(1-self.alpha))/N)
 
-            conf_intervals.append([ensemble_forecast_lower-q_yhat_lower, ensemble_forecast_upper+q_yhat_upper])
+            conf_intervals.append([ensemble_forecast_lower-q_yhat, ensemble_forecast_upper+q_yhat])
 
             actual_value=self.y_test[i]
-            error_lower=ensemble_forecast_lower-actual_value
-            error_upper=actual_value-ensemble_forecast_upper
-            last_s_errors.append([error_lower,error_upper])
+            error=max((ensemble_forecast_lower-q_yhat)-actual_value,actual_value-(ensemble_forecast_upper+q_yhat))
+            last_s_errors.append(error)
 
             if (i+1)%self.s==0:
 
