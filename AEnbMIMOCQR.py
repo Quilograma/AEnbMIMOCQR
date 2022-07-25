@@ -6,6 +6,11 @@ from keras import Sequential
 from keras.models import Model
 from keras.layers import Dense, Input,Dropout
 import keras.backend as K
+import matplotlib.pyplot as plt
+import seaborn as sns
+plt.rcParams["figure.figsize"] = (15,8)
+plt.rcParams.update({'font.size': 30})
+sns.set_style("darkgrid", {'axes.grid' : True})
 
 #quantile loss function
 
@@ -49,7 +54,7 @@ class AEnbMIMOCQR:
     S_b_list=[]
     
 
-    def __init__(self,X_train,y_train,X_val,y_val,B,alpha,phi,epochs,batch_size):
+    def __init__(self,X_train,y_train,X_val,y_val,B,alpha,phi,epochs,batch_size,N):
         self.X_train=X_train
         self.y_train=y_train
         self.X_val=X_val
@@ -60,6 +65,7 @@ class AEnbMIMOCQR:
         self.epochs=epochs
         self.batch_size=batch_size
         self.phi=phi
+        self.K=N
         
     
     
@@ -121,11 +127,11 @@ class AEnbMIMOCQR:
         q_yhats=np.zeros(ncols)
 
         N=len(self.residuals_list)
-        # idx=np.random.choice(N, 100,replace=False)
-        # self.residuals_list=np.array(self.residuals_list)[idx]
-        # self.residuals_list=list(self.residuals_list)
-        # N=len(self.residuals_list)
-        self.gamma=(self.alpha)/N
+        idx=np.random.choice(N, min(N,self.K),replace=False)
+        self.residuals_list=np.array(self.residuals_list)[idx]
+        self.residuals_list=list(self.residuals_list)
+        N=len(self.residuals_list)
+        self.gamma=1/N
         #N=100
 
         for j in range(ncols):
@@ -202,12 +208,7 @@ class AEnbMIMOCQR:
                         else:
                             self.alpha_list[j]=self.alpha_list[j]+self.gamma*(self.alpha_list[j]-1)
                     q=((np.ceil(N+1)*(1-self.alpha_list[j]))/N)
-                    
-                    if q>1:
-                        q=1
-                    elif q<0:
-                        q=0 
-
+                    q=max(0,min(q,1))
                     q_yhats[j]=np.quantile(np.array(self.residuals_list)[:,j],q) 
                # print(self.alpha_list)            
                 last_H_cov=[]
@@ -263,19 +264,26 @@ class AEnbMIMOCQR:
     def summary_statistics(self,arr):
         # calculates summary statistics from array
     
-        return [np.quantile(arr,0.5),np.quantile(arr,0.75)-np.quantile(arr,0.25)]
+        return [np.mean(arr),np.std(arr)]
               
     def calculate_coverage(self):
         y_true,lower_bounds,upper_bounds= self.create_conf_intervals_adaptive()
         interval_sizes=np.abs((upper_bounds-lower_bounds)).flatten()
         counter=0
         counter_per_horizon=np.zeros(y_true.shape[1])
-        
+        coverages=[]
+
         for i in range(y_true.shape[0]):
             for j in range(y_true.shape[1]):
                 if lower_bounds[i][j] < y_true[i][j] and y_true[i][j] < upper_bounds[i][j]:
                     counter+=1
                     counter_per_horizon[j]+=1
+            coverages.append(counter/((i+1)*(j+1)))
+
+        #plt.plot(coverages)
+        #plt.xlabel('t')
+        #plt.ylabel('Coverage')
+        #plt.show()
         
                     
-        return counter/(y_true.shape[0]*y_true.shape[1]),counter_per_horizon/y_true.shape[0],self.summary_statistics(interval_sizes)
+        return counter/(y_true.shape[0]*y_true.shape[1]),counter_per_horizon/y_true.shape[0],self.summary_statistics(interval_sizes),coverages

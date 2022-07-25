@@ -10,7 +10,7 @@ class EnbPI:
     residuals_list=[] # list to store non-conformity scores
     S_b_list=[]
 
-    def __init__(self, B,alpha,s,X_train,y_train,X_test,y_test,timesteps,phi):
+    def __init__(self, B,alpha,s,X_train,y_train,X_test,y_test,timesteps,phi,epochs,batch_size):
         self.B=B
         self.alpha=alpha
         self.s=s
@@ -20,6 +20,8 @@ class EnbPI:
         self.y_test=y_test
         self.phi=phi
         self.timesteps=timesteps
+        self.epochs=epochs
+        self.batch_size=batch_size
     
     def Bootstrap_fit(self):
         N=self.X_train.shape[0]
@@ -27,7 +29,7 @@ class EnbPI:
         for i in range(self.B):
             S_b=np.random.choice(N,N)
             X_train_resampled,y_train_resampled=self.X_train[S_b],self.y_train[S_b]
-            model=MLPRegressor(batch_size=100,max_iter=1000)
+            model=MLPRegressor(batch_size=self.batch_size,max_iter=self.epochs)
             model.fit(X_train_resampled,y_train_resampled)
             self.S_b_list.append(S_b)
             self.models_list.append(model)

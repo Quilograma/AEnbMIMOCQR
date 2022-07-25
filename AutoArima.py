@@ -32,16 +32,18 @@ class auto_arima:
 
     def calculate_metrics(self):
         model=self.fit()
-        fc, confint = model.predict(n_periods=self.H, return_conf_int=True,alpha=self.alpha)
+        fc, confint = model.predict(n_periods=len(self.test), return_conf_int=True,alpha=self.alpha)
 
         lower_bound = confint[:, 0].flatten()
         upper_bound = confint[:, 1].flatten()
 
         interval_width=np.abs(upper_bound-lower_bound)
         counter=0
+        coverages=[]
 
-        for i in range(self.H):
+        for i in range(len(self.test)):
             if self.test[i] >= lower_bound[i] and self.test[i] <= upper_bound[i]:
                 counter+=1
+            coverages.append(counter/(i+1))
         
-        return counter/self.H,self.summary_statistics(interval_width)
+        return counter/len(self.test),self.summary_statistics(interval_width),coverages

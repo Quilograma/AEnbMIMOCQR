@@ -105,11 +105,12 @@ class MIMOCQR:
     def summary_statistics(self,arr):
         # calculates summary statistics from array
     
-        return [np.quantile(arr,0.5),np.quantile(arr,0.75)-np.quantile(arr,0.25)]
+        return [np.mean(arr),np.std(arr)]
 
     def calculate_coverage(self):
         lower_bounds,upper_bounds=self.create_conf_intervals()
         interval_sizes=np.abs(upper_bounds-lower_bounds).flatten()
+        coverages=[]
 
         counter=0
         counter_per_horizon=np.zeros(self.y_val.shape[1])
@@ -119,7 +120,8 @@ class MIMOCQR:
                 if lower_bounds[i][j] < self.y_val[i][j] and self.y_val[i][j] < upper_bounds[i][j]:
                     counter+=1
                     counter_per_horizon[j]+=1
+            coverages.append(counter/((i+1)*(j+1)))
         
         #interval_sizes=(interval_sizes-np.min(interval_sizes))/(np.max(interval_sizes)-np.min(interval_sizes))
 
-        return counter/(self.y_val.shape[0]*self.y_val.shape[1]),counter_per_horizon/self.y_val.shape[0],self.summary_statistics(interval_sizes)
+        return counter/(self.y_val.shape[0]*self.y_val.shape[1]),counter_per_horizon/self.y_val.shape[0],self.summary_statistics(interval_sizes),coverages

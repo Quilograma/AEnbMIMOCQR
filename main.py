@@ -8,11 +8,17 @@ from AEnbMIMOCQR import AEnbMIMOCQR
 from AutoArima import auto_arima
 import warnings
 warnings.filterwarnings("ignore")
+import matplotlib.pyplot as plt
+import seaborn as sns
+plt.rcParams["figure.figsize"] = (15,8)
+plt.rcParams.update({'font.size': 30})
+plt.rc('legend',fontsize=10)
+sns.set_style("darkgrid", {'axes.grid' : True})
 
-def train_val_split(X,y):
+def train_val_split(X,y,N_val=400):
     N=X.shape[0]
-    ntrain=int(N/2)
-    nval=N-ntrain
+    nval=N_val
+    ntrain=N-nval
 
     X_train,y_train,X_val,y_val=X[:ntrain],y[:ntrain],X[-nval:],y[-nval:]
 
@@ -44,6 +50,8 @@ def summary_coverage_widths(conf_PIs,y_test_rec):
     interval_width=np.ones(len(conf_PIs))
 
     counter=0
+    coverages=[]
+
     for i in range(len(conf_PIs)):
         lower_bound=conf_PIs[i][0]
         upper_bound=conf_PIs[i][1]
@@ -51,15 +59,16 @@ def summary_coverage_widths(conf_PIs,y_test_rec):
         if y_test_rec[i]>lower_bound and y_test_rec[i]<upper_bound:
             counter+=1
             interval_width[i]=np.abs(upper_bound-lower_bound)
+        coverages.append(counter/(i+1))
     
     #interval_width=(interval_width-np.min(interval_width))/(np.max(interval_width)-np.min(interval_width))
 
-    return counter/len(y_test_rec),summary_statistics(interval_width)
+    return counter/len(y_test_rec),summary_statistics(interval_width),coverages
 
 def summary_statistics(arr):
     # calculates summary statistics from array
     
-    return [np.quantile(arr,0.5),np.quantile(arr,0.75)-np.quantile(arr,0.25)]
+    return [np.mean(arr),np.std(arr)]
 
 def normalize(arr):
 
@@ -79,19 +88,14 @@ if __name__=='__main__':
     aux3=[]
     aux4=[]
     aux5=[]
-    results_cols=['coverage','median','IQR']
+    results_cols=['coverage','mean','std']
 
 
     for col in cols:
         print(col)
-        
-        #ts=normalize(data[col].values)
-        #arima=auto_arima(ts[:-H],ts[-H:],timesteps,H,alpha)
-        #results=arima.calculate_metrics()
-        #aux5.append([results[0],results[1][0],results[1][1]])
-
         X,y=to_supervised(normalize(data[col].values),n_lags=timesteps,n_output=H)
         X_train,y_train,X_val,y_val=train_val_split(X,y)
+        #print(X_train.shape[0],X_val.shape[0])
 
         S_b=np.random.choice(X_train.shape[0],X_train.shape[0])
         X_train_resampled,y_train_resampled=X_train[S_b],y_train[S_b]
@@ -103,34 +107,50 @@ if __name__=='__main__':
 
         mimocqr=MIMOCQR(X_train_resampled,y_train_resampled,X_train[n_S_B],y_train[n_S_B],X_val,y_val,1000,100,alpha)
         results=mimocqr.calculate_coverage()
-        print(results)
+        #print(results)
+        plt.plot(results[3],label='MIMOCQR')
         aux1.append([results[0],results[2][0],results[2][1]])
-        aenbmimocqr=AEnbMIMOCQR(X_train,y_train,X_val,y_val,1,alpha,phi,1000,100)
+        aenbmimocqr=AEnbMIMOCQR(X_train,y_train,X_val,y_val,1,alpha,phi,1000,100,100)
         results=aenbmimocqr.calculate_coverage()
-        print(results)
+        plt.plot(results[3],label='AEnbMIMOCQR')
+        #print(results)
         aux2.append([results[0],results[2][0],results[2][1]])
 
         X_rec,y_rec=to_supervised(normalize(data[col].values),n_lags=timesteps,n_output=1)
         X_train,y_train,X_val,y_val=train_val_split(X_rec,y_rec)
 
-        enbpi=EnbPI(1,alpha,30,X_train,y_train,X_val,y_val,timesteps,phi)
+        enbpi=EnbPI(1,alpha,30,X_train,y_train,X_val,y_val,timesteps,phi,1000,100)
         conf_PIs=enbpi.Conf_PIs()
         results=summary_coverage_widths(conf_PIs,y_val)
-        print(results)
+        plt.plot(results[2],label='EnbPI')
+        #print(results)
         aux3.append([results[0],results[1][0],results[1][1]])
         encqr=EnCQR(1,alpha,30,X_train,y_train,X_val,y_val,timesteps,phi,1000,100)
         conf_PIs=encqr.Conf_PIs()
         results=summary_coverage_widths(conf_PIs,y_val)
-        print(results)
+        plt.plot(results[2],label='EnbCQR')
+        #print(results)
         aux4.append([results[0],results[1][0],results[1][1]])
+        ts=normalize(data[col].values)
+        arima=auto_arima(ts[:-400],ts[-400:],timesteps,H,alpha)
+        results=arima.calculate_metrics()
+        plt.plot(results[2],label='ARIMA')
+        aux5.append([results[0],results[1][0],results[1][1]])
+        
+        plt.legend(loc='upper right')
+        plt.xlabel('t')
+        plt.ylabel('Coverage')
+        plt.axhline(y = 1-alpha, color = 'black', linestyle = '--')
+        plt.ylim(0.5,1)
+        plt.show()
         
 
         lst_results=[]
-        #lst_results.append(np.median(aux5,axis=0))
-        lst_results.append(np.median(aux1,axis=0))
-        lst_results.append(np.median(aux2,axis=0))
-        lst_results.append(np.median(aux3,axis=0))
-        lst_results.append(np.median(aux4,axis=0))
+        lst_results.append(np.mean(aux1,axis=0))
+        lst_results.append(np.mean(aux2,axis=0))
+        lst_results.append(np.mean(aux3,axis=0))
+        lst_results.append(np.mean(aux4,axis=0))
+        lst_results.append(np.mean(aux5,axis=0))
         df_results=pd.DataFrame(lst_results,columns=results_cols)
         print(df_results.to_latex())
 
