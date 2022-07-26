@@ -1,4 +1,5 @@
 from logging.handlers import QueueHandler
+from re import S
 from sklearn.utils import resample
 import numpy as np
 from sklearn.neural_network import MLPRegressor
@@ -61,13 +62,14 @@ class EnbPI:
         last_s_errors=[]
         conf_intervals=[]
         forecasts=[]
+        cicle=0
 
         for i in range(self.X_test.shape[0]):
             forecast=[]
             X_input=[]
             for k in range(self.timesteps):
-                if(k+i<self.timesteps):
-                    X_input.append(self.X_train[-1][k+i])
+                if(k+i<self.timesteps+cicle*self.timesteps):
+                    X_input.append(self.X_train[-1][(k+i)%self.timesteps])
                 else:
                     X_input.append(forecasts[-(self.timesteps-k-i)])
             
@@ -87,10 +89,19 @@ class EnbPI:
             last_s_errors.append(error)
 
             if (i+1)%self.s==0:
+                
+                self.X_train=list(self.X_train)
+                aux=[]
+                for k in range(self.timesteps):
+                    aux.append(self.X_test[i][k])
+
+                self.X_train.append(aux)
+                self.X_train=np.array(self.X_train)
 
                 for k in range(self.s):
                     del self.residuals_list[0]
                     self.residuals_list.append(last_s_errors[k])
                 last_s_errors=[]
+                cicle+=1
 
         return conf_intervals

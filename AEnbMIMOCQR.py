@@ -1,4 +1,5 @@
 from logging.handlers import QueueHandler
+from tabnanny import verbose
 from sklearn.utils import resample
 import numpy as np
 from sklearn.neural_network import MLPRegressor
@@ -264,7 +265,7 @@ class AEnbMIMOCQR:
     def summary_statistics(self,arr):
         # calculates summary statistics from array
     
-        return [np.mean(arr),np.std(arr)]
+        return [np.median(arr),np.quantile(arr,0.75)-np.quantile(arr,0.25)]
               
     def calculate_coverage(self):
         y_true,lower_bounds,upper_bounds= self.create_conf_intervals_adaptive()

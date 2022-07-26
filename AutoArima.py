@@ -4,11 +4,10 @@ import numpy as np
 
 class auto_arima:
     
-    def __init__(self,train,test,timesteps,H,alpha):
+    def __init__(self,train,test,timesteps,alpha):
         self.train=train
         self.test=test
         self.timesteps=timesteps
-        self.H=H
         self.alpha=alpha
     
     def fit(self):
@@ -16,8 +15,14 @@ class auto_arima:
         model = pm.auto_arima(self.train,
                       m=1,             
                       d=None,           
-                      seasonal=False,   
-                      start_P=0, 
+                      seasonal=False,
+                      start_p=self.timesteps,
+                      max_p=self.timesteps,
+                      start_q=self.timesteps,
+                      max_q=self.timesteps,   
+                      start_P=0,
+                      method='nm',
+                      alpha=self.alpha, 
                       D=None,
                       max_order =None, 
                       trace=True,

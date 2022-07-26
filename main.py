@@ -68,7 +68,7 @@ def summary_coverage_widths(conf_PIs,y_test_rec):
 def summary_statistics(arr):
     # calculates summary statistics from array
     
-    return [np.mean(arr),np.std(arr)]
+    return [np.median(arr),np.quantile(arr,0.75)-np.quantile(arr,0.25)]
 
 def normalize(arr):
 
@@ -82,6 +82,8 @@ if __name__=='__main__':
     timesteps=40
     H=30
     alpha=0.1
+    B=1
+    s=H
     cols=data.columns
     aux1=[]
     aux2=[]
@@ -110,7 +112,7 @@ if __name__=='__main__':
         #print(results)
         plt.plot(results[3],label='MIMOCQR')
         aux1.append([results[0],results[2][0],results[2][1]])
-        aenbmimocqr=AEnbMIMOCQR(X_train,y_train,X_val,y_val,1,alpha,phi,1000,100,100)
+        aenbmimocqr=AEnbMIMOCQR(X_train,y_train,X_val,y_val,B,alpha,phi,1000,100,100)
         results=aenbmimocqr.calculate_coverage()
         plt.plot(results[3],label='AEnbMIMOCQR')
         #print(results)
@@ -119,30 +121,30 @@ if __name__=='__main__':
         X_rec,y_rec=to_supervised(normalize(data[col].values),n_lags=timesteps,n_output=1)
         X_train,y_train,X_val,y_val=train_val_split(X_rec,y_rec)
 
-        enbpi=EnbPI(1,alpha,30,X_train,y_train,X_val,y_val,timesteps,phi,1000,100)
+        enbpi=EnbPI(B,alpha,s,X_train,y_train,X_val,y_val,timesteps,phi,1000,100)
         conf_PIs=enbpi.Conf_PIs()
         results=summary_coverage_widths(conf_PIs,y_val)
         plt.plot(results[2],label='EnbPI')
         #print(results)
         aux3.append([results[0],results[1][0],results[1][1]])
-        encqr=EnCQR(1,alpha,30,X_train,y_train,X_val,y_val,timesteps,phi,1000,100)
+        encqr=EnCQR(B,alpha,s,X_train,y_train,X_val,y_val,timesteps,phi,1000,100)
         conf_PIs=encqr.Conf_PIs()
         results=summary_coverage_widths(conf_PIs,y_val)
         plt.plot(results[2],label='EnbCQR')
         #print(results)
         aux4.append([results[0],results[1][0],results[1][1]])
         ts=normalize(data[col].values)
-        arima=auto_arima(ts[:-400],ts[-400:],timesteps,H,alpha)
+        arima=auto_arima(ts[:-400],ts[-400:],timesteps,alpha)
         results=arima.calculate_metrics()
         plt.plot(results[2],label='ARIMA')
         aux5.append([results[0],results[1][0],results[1][1]])
         
-        plt.legend(loc='upper right')
+        plt.legend(loc='lower left')
         plt.xlabel('t')
         plt.ylabel('Coverage')
         plt.axhline(y = 1-alpha, color = 'black', linestyle = '--')
-        plt.ylim(0.5,1)
-        plt.show()
+        #plt.ylim(0.5,1)
+        #plt.show()
         
 
         lst_results=[]
