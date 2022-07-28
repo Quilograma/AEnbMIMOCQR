@@ -1,1 +1,1 @@
-# AdapativeMIMOCQR
+# AdaptiveEnbMIMOCQR
