@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 plt.rcParams["figure.figsize"] = (15,8)
 plt.rcParams.update({'font.size': 30})
-plt.rc('legend',fontsize=10)
+plt.rc('legend',fontsize=20)
 sns.set_style("darkgrid", {'axes.grid' : True})
 
 def train_val_split(X,y,N_val=400):
@@ -82,7 +82,7 @@ if __name__=='__main__':
     timesteps=40
     H=30
     alpha=0.1
-    B=1
+    B=10
     s=H
     cols=data.columns
     aux1=[]
@@ -90,7 +90,7 @@ if __name__=='__main__':
     aux3=[]
     aux4=[]
     aux5=[]
-    results_cols=['coverage','mean','std']
+    results_cols=['Coverage','Median','IQR']
 
 
     for col in cols:
@@ -143,8 +143,8 @@ if __name__=='__main__':
         plt.xlabel('t')
         plt.ylabel('Coverage')
         plt.axhline(y = 1-alpha, color = 'black', linestyle = '--')
-        #plt.ylim(0.5,1)
-        #plt.show()
+        plt.ylim(0.5,1)
+        plt.show()
         
 
         lst_results=[]

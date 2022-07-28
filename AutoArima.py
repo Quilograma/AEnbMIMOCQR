@@ -26,7 +26,7 @@ class auto_arima:
                       D=None,
                       max_order =None, 
                       trace=True,
-                      error_action='ignore',  
+                      error_action='ignore', 
                       suppress_warnings=True, 
                       stepwise=True)
         return model
