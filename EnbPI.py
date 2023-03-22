@@ -1,107 +1,78 @@
-from logging.handlers import QueueHandler
-from re import S
-from sklearn.utils import resample
+from models import MLPRegressor
 import numpy as np
-from sklearn.neural_network import MLPRegressor
-from sklearn.ensemble import HistGradientBoostingRegressor
+from utils import to_supervised
 
 class EnbPI:
 
-    models_list=[] # list to store B bootstrap models
-    residuals_list=[] # list to store non-conformity scores
-    S_b_list=[]
+    models = []
+    residuals = []
+    S_b_list = []
 
-    def __init__(self, B,alpha,s,X_train,y_train,X_test,y_test,timesteps,phi,epochs,batch_size):
-        self.B=B
-        self.alpha=alpha
-        self.s=s
-        self.X_train=X_train
-        self.y_train=y_train
-        self.X_test=X_test
-        self.y_test=y_test
-        self.phi=phi
-        self.timesteps=timesteps
-        self.epochs=epochs
-        self.batch_size=batch_size
-    
-    def Bootstrap_fit(self):
-        N=self.X_train.shape[0]
+    def __init__(self, B, alpha, phi) -> None:
 
+        if not isinstance(B, int):
+            raise TypeError("Value must be an integer")
+        
+        self.B = B
+
+        if alpha < 0 or alpha >1:
+            raise ValueError('alpha must be between 0 a 1')
+        
+        self.alpha = alpha
+
+        if phi not in ['mean','median']:
+
+            raise ValueError("Value must be 'mean' or 'median'")
+        
+        self.phi = phi
+
+    def fit(self, X_train, y_train, epochs):
+        
+        # Train b models in bootstrap datasets (bagging)
         for i in range(self.B):
-            S_b=np.random.choice(N,N)
-            X_train_resampled,y_train_resampled=self.X_train[S_b],self.y_train[S_b]
-            model=MLPRegressor(batch_size=self.batch_size,max_iter=self.epochs)
-            model.fit(X_train_resampled,y_train_resampled)
-            self.S_b_list.append(S_b)
-            self.models_list.append(model)
+
+            S_b = np.random.choice(X_train.shape[1], X_train.shape[1], replace=True)
             
-        return self.models_list
+            model = MLPRegressor(X_train.shape[1], y_train.shape[1])
 
-    def LOO_errors(self):
+            model.fit(X_train[S_b], y_train[S_b], epochs=epochs, verbose = 0)
 
-        for i in range(self.X_train.shape[0]):
-            forecast=[]
-            counter=0
+            self.models.append(model)
+            self.S_b_list.append(S_b)
+
+
+        # Compute in-sample out-of-bag non-conformity scores
+        for i in range(X_train.shape[0]):
+            # list to know which models incorporate the ensemble
+            ensemble_list = []
+
             for j in range(self.B):
                 if i not in self.S_b_list[j]:
-                    counter+=1
+                    ensemble_list.append(j)
 
-                    forecast.append(self.models_list[j].predict(self.X_train[i].reshape(1, -1))[0])
-            actual_value=self.y_train[i]
-            
-            if counter >0:
-                self.residuals_list.append(np.abs(self.phi(forecast)-actual_value))
+            if len(ensemble_list)>0:
+                # list of forecasts
+                yhat_list = []
 
-        return self.residuals_list
+                for k in ensemble_list:
+                    yhat_list.append(self.models[k].predict(X_train[i].reshape(1,-1))[0][0])
 
-    def Conf_PIs(self):
-        self.Bootstrap_fit()
-        self.LOO_errors()
-
-        N=len(self.residuals_list)
-        last_s_errors=[]
-        conf_intervals=[]
-        forecasts=[]
-        cicle=0
-
-        for i in range(self.X_test.shape[0]):
-            forecast=[]
-            X_input=[]
-            for k in range(self.timesteps):
-                if(k+i<self.timesteps+cicle*self.timesteps):
-                    X_input.append(self.X_train[-1][(k+i)%self.timesteps])
+                if self.phi == 'mean':
+                    ensemble_forecast = np.mean(yhat_list)
                 else:
-                    X_input.append(forecasts[-(self.timesteps-k-i)])
-            
-            X_input=np.array(X_input)
-            X_input=X_input.reshape(1,-1)
+                    ensemble_forecast = np.median(yhat_list)
 
-            for j in range(self.B):
-                forecast.append(self.models_list[j].predict(X_input)[0])
+                self.residuals.append(np.abs(ensemble_forecast-y_train[i][0]))
 
-            ensemble_forecast=self.phi(forecast)
-            forecasts.append(ensemble_forecast)
-            q_yhat=np.quantile(self.residuals_list,np.floor((N+1)*(1-self.alpha))/N)
-            conf_intervals.append([ensemble_forecast-q_yhat, ensemble_forecast+q_yhat])
 
-            actual_value=self.y_test[i]
-            error=np.abs(ensemble_forecast-actual_value)
-            last_s_errors.append(error)
+if __name__ == '__main__':
 
-            if (i+1)%self.s==0:
-                
-                self.X_train=list(self.X_train)
-                aux=[]
-                for k in range(self.timesteps):
-                    aux.append(self.X_test[i][k])
+    ts = [i for i in range(100)]
 
-                self.X_train.append(aux)
-                self.X_train=np.array(self.X_train)
+    X, y = to_supervised(ts, 5, 1)
 
-                for k in range(self.s):
-                    del self.residuals_list[0]
-                    self.residuals_list.append(last_s_errors[k])
-                last_s_errors=[]
-                cicle+=1
+    model_enbpi = EnbPI(3, 0.1,'mean')
 
-        return conf_intervals
+    model_enbpi.fit(X, y, 100)
+    
+    print(len(model_enbpi.residuals))                
