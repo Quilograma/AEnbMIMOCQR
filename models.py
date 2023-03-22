@@ -4,12 +4,12 @@ from tensorflow.keras import layers
 import numpy as np
 
 
-def MLPRegressor(n_in,n_out):
+def MLPRegressor(n_in):
     # Define the MLP model
     model = keras.Sequential([
         layers.Dense(64, activation='relu', input_shape=[n_in]),
         layers.Dense(64, activation='relu'),
-        layers.Dense(n_out)
+        layers.Dense(1)
     ])
 
     # Compile the model
@@ -24,7 +24,7 @@ def quantile_loss(q, y, pred):
 
 
 # mlp quantileregression
-def MLPQuantile(n_in, n_out, quantiles):
+def MLPQuantile(n_in, quantiles):
 
     inputs = keras.Input(shape=n_in)
     x = layers.Dense(64, activation="relu")(inputs)
@@ -32,10 +32,10 @@ def MLPQuantile(n_in, n_out, quantiles):
 
     outputs = []
     for quantile in quantiles:
-        outputs.append(layers.Dense(n_out)(x))
+        outputs.append(layers.Dense(1)(x))
 
     model = keras.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=[lambda y, pred: quantile_loss(q, y, pred) for q in quantiles], optimizer="adam")
 
-    return 
+    return model
 
