@@ -1,18 +1,34 @@
+""" 
+	author: Martim Sousa
+	date:    23/03/2023
+    Description: This code is an adaption of EnbPI
+    for multi-step ahead prediction intervals via
+    the recursive strategy.
+"""
+
+
 from models import MLPRegressor
 import numpy as np
 from utils import to_supervised
 
+
 class EnbPI:
 
-    models = []
-    residuals = []
-    S_b_list = []
-    last_H_ensemble_forecasts = []
-    counter = 0
-    qhat = 0
-    X_input = []
+    models = [] # list of models
+    residuals = [] # non-conformity set
+    S_b_list = [] # list of bootstrap indexes 
+    last_H_ensemble_forecasts = [] # list to store the lastest H-th forecasts
+    counter = 0 # counter to know when the residuals should be updated
+    qhat = 0 # empirical quantile
+    X_input = [] # current input to be used to make predictions
+
 
     def __init__(self, B, alpha, phi, H) -> None:
+
+        # B: Number of bootstrap models
+        # alpha: miscoverage rate
+        # phi: aggregation function, only mean or median available
+        # H: forecast horizon dimension
 
         if not isinstance(B, int):
             raise TypeError("Value must be an integer")
@@ -20,7 +36,7 @@ class EnbPI:
         self.B = B
 
         if alpha < 0 or alpha >1:
-            raise ValueError('alpha must be between 0 a 1')
+            raise ValueError('alpha must be between 0 and 1')
         
         self.alpha = alpha
 
@@ -31,7 +47,7 @@ class EnbPI:
         self.phi = phi
 
         if not isinstance(H, int):
-            raise TypeError("Value must be an integer")
+            raise TypeError("H must be an integer")
         
         self.H = H
 
@@ -41,12 +57,16 @@ class EnbPI:
         # Train b models in bootstrap datasets (bagging)
         for i in range(self.B):
 
+            # get bootstrap indexes
             S_b = np.random.choice(X_train.shape[1], X_train.shape[1], replace=True)
             
+            #Initialize the model with approriate input dim
             model = MLPRegressor(X_train.shape[1])
 
+            #fit the model on bootstrap datasets
             model.fit(X_train[S_b], y_train[S_b], epochs=epochs, verbose = 0)
 
+            #apppend the model to the list and the bootstrap indexes
             self.models.append(model)
             self.S_b_list.append(S_b)
 
@@ -57,8 +77,12 @@ class EnbPI:
             ensemble_list = []
 
             for j in range(self.B):
+                #incorporate model if it did not use observation i for training
                 if i not in self.S_b_list[j]:
                     ensemble_list.append(j)
+            
+            #if there is at least one model which did not i for training
+            # produce a prediction and store the associated non-conformity score
 
             if len(ensemble_list)>0:
                 # list of forecasts
@@ -86,6 +110,7 @@ class EnbPI:
         # list of H ensemble forecasts
         ensemble_PIs_list = []
 
+        # Deliver multi-step ahead prediction intervals
         for i in range(self.H):
 
             # list of forecasts
@@ -108,6 +133,7 @@ class EnbPI:
 
         return ensemble_PIs_list
 
+    #update the non-conformity score set with new scores 
     def update(self,ground_truth):
         assert len(ground_truth) == len(self.last_H_ensemble_forecasts)
 
@@ -121,6 +147,7 @@ class EnbPI:
         self.last_H_ensemble_forecasts = []
         self.qhat = np.quantile(self.residuals,1-self.alpha)
 
+        #update the X_input
         if len(self.X_input) > len(ground_truth):
             self.X_input = self.X_input[len(ground_truth)-len(self.X_input):] + ground_truth
         else:

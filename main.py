@@ -2,7 +2,7 @@ from unittest import result
 from EnbPI import EnbPI
 import numpy as np
 import pandas as pd
-from EnCQR import EnCQR
+from EnbCQR import EnCQR
 from MIMOCQR import MIMOCQR
 from AEnbMIMOCQR import AEnbMIMOCQR
 from AutoArima import auto_arima
