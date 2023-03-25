@@ -58,7 +58,7 @@ class EnbPI:
         for i in range(self.B):
 
             # get bootstrap indexes
-            S_b = np.random.choice(X_train.shape[1], X_train.shape[1], replace=True)
+            S_b = np.random.choice(X_train.shape[0], X_train.shape[0], replace=True)
             
             #Initialize the model with approriate input dim
             model = MLPRegressor(X_train.shape[1])
@@ -100,7 +100,9 @@ class EnbPI:
         
         #compute empirical quantile
         self.qhat = np.quantile(self.residuals,1-self.alpha)
-        self.X_input = list(X_train[-1])
+        aux = list(X_train[-1]) + list(y_train[-1])
+
+        self.X_input = aux[-X_train.shape[1]:]
 
     def forecast(self):
 

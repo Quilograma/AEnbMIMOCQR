@@ -25,7 +25,7 @@ def quantile_loss(q, y, pred):
 
 
 # mlp quantileregression
-def MLPQuantile(n_in, quantiles):
+def MLPQuantile(n_in,n_out, quantiles):
 
     inputs = keras.Input(shape=n_in)
     x = layers.Dense(64, activation="relu")(inputs)
@@ -33,7 +33,7 @@ def MLPQuantile(n_in, quantiles):
 
     outputs = []
     for quantile in quantiles:
-        outputs.append(layers.Dense(1)(x))
+        outputs.append(layers.Dense(n_out)(x))
 
     model = keras.Model(inputs=inputs, outputs=outputs)
     model.compile(loss=[lambda y, pred: quantile_loss(q, y, pred) for q in quantiles], optimizer="adam")

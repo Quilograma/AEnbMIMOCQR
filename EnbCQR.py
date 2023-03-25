@@ -9,7 +9,6 @@
 from models import MLPQuantile
 import numpy as np
 from utils import to_supervised
-from sklearn.preprocessing import MinMaxScaler
 
 class EnbCQR:
 
@@ -58,10 +57,10 @@ class EnbCQR:
         for i in range(self.B):
 
             # get bootstrap indexes
-            S_b = np.random.choice(X_train.shape[1], X_train.shape[1], replace=True)
+            S_b = np.random.choice(X_train.shape[0], X_train.shape[0], replace=True)
             
             #Initialize the model with approriate input dim
-            model = MLPQuantile(X_train.shape[1], quantiles=[self.alpha/2, 0.5, 1-self.alpha/2])
+            model = MLPQuantile(X_train.shape[1], 1,  quantiles=[self.alpha/2, 0.5, 1-self.alpha/2])
 
             #fit the model on bootstrap datasets
             model.fit(X_train[S_b], y_train[S_b], epochs=epochs, verbose = 0)
@@ -107,7 +106,9 @@ class EnbCQR:
         
         #compute empirical quantile
         self.qhat = np.quantile(self.residuals,1-self.alpha)
-        self.X_input = list(X_train[-1])
+        aux = list(X_train[-1]) + list(y_train[-1])
+        
+        self.X_input = aux[-X_train.shape[1]:]
 
     def forecast(self):
 
@@ -193,4 +194,4 @@ if __name__ == '__main__':
             print(model_enbcqr.X_input)
             model_enbcqr.update([100+j-1, 100 + j])
             print(model_enbcqr.X_input)
-            print ('Updated',len(model_enbcqr.residuals), model_enbcqr.qhat)  
+            print('Updated',len(model_enbcqr.residuals), model_enbcqr.qhat)  
