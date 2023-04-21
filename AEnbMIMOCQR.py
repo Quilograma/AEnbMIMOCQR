@@ -19,15 +19,16 @@ class AEnbMIMOCQR:
     counter = 0 # counter to know when the residuals should be updated
     qhat = [] # empirical quantile
     X_input = [] # current input to be used to make predictions
-    gamma = 0 # learning rate of ACI
+    gamma = 0 # learning rate of ACI 
     
 
-    def __init__(self, B, alpha, phi, H) -> None:
+    def __init__(self, B, alpha, phi, H, T = 0) -> None:
 
         # B: Number of bootstrap models
         # alpha: miscoverage rate
         # phi: aggregation function, only mean or median available
         # H: forecast horizon dimension
+        # T: optional sampling of the non-conformity scores
 
         if not isinstance(B, int):
             raise TypeError("Value must be an integer")
@@ -54,7 +55,11 @@ class AEnbMIMOCQR:
             raise ValueError("Value must be 'mean' or 'median'")
         
         self.phi = phi
+        
+        if not isinstance(T, int):
+            raise TypeError("T must be an integer")
 
+        self.T = T
 
     def fit(self, X_train, y_train, epochs):
         
@@ -121,6 +126,14 @@ class AEnbMIMOCQR:
 
         aux = list(X_train[-1]) + list(y_train[-1])
         self.X_input = aux[-X_train.shape[1]:]
+
+
+        # non-conformity score sampling
+        if self.T !=0 and self.T < len(self.residuals):
+            indices_aux = np.random.choice(len(self.residuals), self.T, replace = False)
+            self.residuals = list(np.array(self.residuals)[indices_aux])
+
+        print(np.array(self.residuals).shape)
         self.gamma = 1/len(self.residuals)
 
 
@@ -196,7 +209,7 @@ if __name__ == '__main__':
 
     X, y = to_supervised(ts, 5, 2)
 
-    model_enbcqr = AEnbMIMOCQR(3, 0.1,'mean',2)
+    model_enbcqr = AEnbMIMOCQR(3, 0.1,'mean',2, 100)
     
     model_enbcqr.fit(X, y, 100)
     
