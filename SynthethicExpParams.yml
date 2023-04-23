@@ -1,0 +1,8 @@
+B: 10
+lags: 40
+H: 30
+phi: mean
+T: 100
+alpha : 0.1
+n_test: 390
+epochs: 100

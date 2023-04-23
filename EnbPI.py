@@ -107,7 +107,7 @@ class EnbPI:
     def forecast(self):
 
         if self.counter == 1:
-            raise Exception('Please, update the non-conformity score set before proceeding!')
+            raise Exception('Please, update with the new ground truth values before proceeding!')
         
         # list of H ensemble forecasts
         ensemble_PIs_list = []
@@ -151,7 +151,7 @@ class EnbPI:
 
         #update the X_input
         if len(self.X_input) > len(ground_truth):
-            self.X_input = self.X_input[len(ground_truth)-len(self.X_input):] + ground_truth
+            self.X_input = self.X_input[len(ground_truth)-len(self.X_input):] + list(ground_truth)
         else:
             self.X_input = ground_truth[-len(self.X_input):]    
 

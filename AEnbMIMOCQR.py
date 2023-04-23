@@ -132,34 +132,28 @@ class AEnbMIMOCQR:
         if self.T !=0 and self.T < len(self.residuals):
             indices_aux = np.random.choice(len(self.residuals), self.T, replace = False)
             self.residuals = list(np.array(self.residuals)[indices_aux])
-
-        print(np.array(self.residuals).shape)
         self.gamma = 1/len(self.residuals)
 
 
     def forecast(self):
 
         if self.counter == 1:
-            raise Exception('Please, update the non-conformity score set before proceeding!')
+            raise Exception('Please, update with the new ground truth values before proceeding!')
         
         # list of H ensemble forecasts
 
         yhat_list_lower = []
-        yhat_list = []
         yhat_list_upper = []
 
         for model in self.models:
             yhat_list_lower.append(model.predict(np.array(self.X_input).reshape(1,-1))[0].flatten())
-            yhat_list.append(model.predict(np.array(self.X_input).reshape(1,-1))[1].flatten())
             yhat_list_upper.append(model.predict(np.array(self.X_input).reshape(1,-1))[2].flatten())
 
         if self.phi == 'mean':
             ensemble_forecast_lower = np.mean(np.array(yhat_list_lower), axis=0)
-            ensemble_forecast = np.mean(np.array(yhat_list), axis=0)
             ensemble_forecast_upper = np.mean(np.array(yhat_list_upper), axis=0)
         else:
             ensemble_forecast_lower = np.median(np.array(yhat_list_lower), axis=0)
-            ensemble_forecast = np.median(np.array(yhat_list), axis=0)
             ensemble_forecast_upper = np.median(np.array(yhat_list_upper), axis=0)
 
         self.last_H_ensemble_forecasts = [ensemble_forecast_lower - self.qhat, ensemble_forecast_upper + self.qhat]
@@ -179,10 +173,10 @@ class AEnbMIMOCQR:
 
             if ground_truth[i] > self.last_H_ensemble_forecasts[0][i] and ground_truth[i] <  self.last_H_ensemble_forecasts[1][i]:
                 
-                self.alpha[i] = self.alpha[i] + self.gamma * self.desired_alpha
+                self.alpha[i] = min(0,max(self.alpha[i] + self.gamma * self.desired_alpha,1))
             
             else: 
-                self.alpha[i] = self.alpha[i] + self.gamma * (self.desired_alpha-1)
+                self.alpha[i] = min(0,max(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
         
         self.residuals.append(new_non_conformity_scores)
         del self.residuals[0]
@@ -194,12 +188,10 @@ class AEnbMIMOCQR:
         for h in range(self.H):
             self.qhat[h] = np.quantile(np.array(self.residuals)[:,h], 1-self.alpha[h]) 
 
-        print(self.qhat)
-        print(self.alpha)
         
         #update the X_input
         if len(self.X_input) > len(ground_truth):
-            self.X_input = self.X_input[len(ground_truth)-len(self.X_input):] + ground_truth
+            self.X_input = self.X_input[len(ground_truth)-len(self.X_input):] + list(ground_truth)
         else:
             self.X_input = ground_truth[-len(self.X_input):]    
 
