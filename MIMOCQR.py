@@ -147,12 +147,18 @@ class MIMOCQR:
         self.last_H_ensemble_forecasts = [ensemble_forecast_lower - self.qhat, ensemble_forecast_upper + self.qhat]
         self.counter+=1
 
-        return [ensemble_forecast_lower - self.qhat, ensemble_forecast_upper + self.qhat]
+        # H-step ahead prediction intervals to return
+        r = []
+        for i in range(self.H):
+            r.append([ensemble_forecast_lower[i] - self.qhat[i], ensemble_forecast_upper[i] + self.qhat[i]])
+
+        return r
     
     #update the non-conformity score set with new scores 
     def update(self,ground_truth):
         assert len(ground_truth) == len(self.last_H_ensemble_forecasts[0])
 
+        self.counter = 0
 
         #update the X_input
         if len(self.X_input) > len(ground_truth):
@@ -166,7 +172,7 @@ if __name__ == '__main__':
 
     X, y = to_supervised(ts, 5, 2)
 
-    model_enbcqr = AEnbMIMOCQR(3, 0.1,'mean',2, 100)
+    model_enbcqr = MIMOCQR(3, 0.1,'mean',2, 100)
     
     model_enbcqr.fit(X, y, 100)
     

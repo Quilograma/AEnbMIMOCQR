@@ -159,7 +159,13 @@ class AEnbMIMOCQR:
         self.last_H_ensemble_forecasts = [ensemble_forecast_lower - self.qhat, ensemble_forecast_upper + self.qhat]
         self.counter+=1
 
-        return [ensemble_forecast_lower - self.qhat, ensemble_forecast_upper + self.qhat]
+        # H-step ahead prediction intervals to return
+        r = []
+        for i in range(self.H):
+            r.append([ensemble_forecast_lower[i] - self.qhat[i], ensemble_forecast_upper[i] + self.qhat[i]])
+
+
+        return r
     
     #update the non-conformity score set with new scores 
     def update(self,ground_truth):

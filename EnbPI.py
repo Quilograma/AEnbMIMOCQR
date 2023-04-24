@@ -161,7 +161,7 @@ if __name__ == '__main__':
 
     X, y = to_supervised(ts, 5, 1)
 
-    model_enbpi = EnbPI(3, 0.1,'mean',2)
+    model_enbpi = EnbPI(3, 0.1,'mean',3)
     
     model_enbpi.fit(X, y, 100)
     

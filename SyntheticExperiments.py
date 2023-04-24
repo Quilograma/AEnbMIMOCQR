@@ -18,7 +18,7 @@ from AutoArima import ARIMAModel
 from scipy.stats import norm
 
 # read params from yaml file
-with open(os.path.join(os.path.dirname(__file__), 'SynthethicExpParams.yml'), 'r') as f:
+with open(os.path.join(os.path.dirname(__file__), 'ExpParams.yml'), 'r') as f:
     try:
         d_params= yaml.safe_load(f)
     except yaml.YAMLError as exc:
@@ -96,10 +96,13 @@ model_enbcqr = EnbCQR(B, alpha, phi, H)
 model_enbpi.fit(X, y, epochs = epochs)
 model_enbcqr.fit(X, y, epochs = epochs)
 
+# iou list for all models
 iou_list = []
 
+
+
+iou_list_aux = []
 for i in range(0,n_test, H):
-    iou_list_aux = []
     forecast = model_arima.forecast()
 
     for j in range(len(forecast)):
@@ -113,30 +116,33 @@ for i in range(0,n_test, H):
     
     model_arima.update(df_test.iloc[i:i+30]['series'].values)
 
+
+
 iou_list.append(iou_list_aux)
+
 
 for model in [model_mimocqr, model_aenbmimocqr, model_enbpi, model_enbcqr]:
     iou_list_aux = []
     for i in range(0,n_test, H):
 
         forecast = model.forecast()
-        forecast_lower = forecast[0]
-        forecast_upper = forecast[1]
 
-        for j in range(len(forecast_lower)):
+        for j in range(len(forecast)):
             mu = df_test.iloc[i+j]['mean_series']
             std = df_test.iloc[i+j]['std_series']
 
-            iou_list_aux.append(compute_iou([forecast_lower[j], forecast_upper[j]],[mu-inv_cdf*std, mu+inv_cdf*std]))
+            iou_list_aux.append(compute_iou([forecast[j][0], forecast[j][1]],[mu - inv_cdf*std, mu + inv_cdf*std]))
 
 
         model.update(df_test.iloc[i:i+30]['series'].values)
+    
     iou_list.append(iou_list_aux)
 
 #average the iou
 final_iou = np.mean(np.array(iou_list), axis = 1)
+print(final_iou)
 
-d = {'ARIMA': final_iou[0], 'MIMOCQR': final_iou[1], 'AEnbMIMOCQR' : final_iou[2], 'EnbPI': final_iou[3], 'EnbCQR': final_iou[4]}
+d = {'ARIMA': [final_iou[0]], 'MIMOCQR': [final_iou[1]], 'AEnbMIMOCQR' : [final_iou[2]], 'EnbPI': [final_iou[3]], 'EnbCQR': [final_iou[4]]}
 df_final = pd.DataFrame(d)
 
 print(df_final.to_latex())
