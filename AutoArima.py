@@ -7,7 +7,8 @@ class ARIMAModel:
         self.time_series = list(time_series)
         self.alpha = alpha
         self.horizon = horizon
-        self. p = p
+        self.H = horizon
+        self.p = p
         self.model = None
 
     def train(self):
@@ -15,25 +16,22 @@ class ARIMAModel:
                                    seasonal=False,
                                    p=self.p,
                                    suppress_warnings=True)
+        self.model.fit(self.time_series)
 
     def forecast(self):
         if self.model is None:
             raise Exception('Model not trained')
 
-        # Fit the model on the entire time series
-        self.model.fit(self.time_series)
-
         # Generate H-step ahead forecast intervals
-        forecasts, conf_int = self.model.predict(n_periods=self.horizon,
+        conf_int = self.model.predict(n_periods=self.horizon,
                                                   return_conf_int=True,
                                                   alpha=self.alpha)
 
         # Return confidence intervals
-        return conf_int
+        return conf_int[1][-self.H:]
     
     def update(self, ground_truth):
-        self.time_series = self.time_series + list(ground_truth)
-        self.train()
+        self.horizon = self.horizon + len(ground_truth)
     
 
 if __name__ =='__main__':
@@ -49,18 +47,16 @@ if __name__ =='__main__':
     model.train()
 
     # Make predictions
-    forecasts, conf_int = model.predict()
+    conf_int = model.forecast()
 
-    # Print forecasts and corresponding intervals
-    print('Forecasts:', forecasts)
+    # Print corresponding intervals
     print('Confidence intervals:', conf_int)
 
-    model.update([1024, 2048])
+    model.update([1024,2048])
 
 
     # Make predictions
-    forecasts, conf_int = model.predict()
+    conf_int = model.forecast()
 
-    print('Forecasts:', forecasts)
     print('Confidence intervals:', conf_int)
 
