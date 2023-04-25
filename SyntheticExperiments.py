@@ -66,7 +66,7 @@ epochs = d_params['epochs']
 inv_cdf = norm.ppf(1-alpha/2)
 
 # read the dataset
-df = pd.read_csv("SyntheticDataset (1).csv")
+df = pd.read_csv("SyntheticDataset.csv")
 
 # extract train and test datasets
 df_train = df[:-n_test]
