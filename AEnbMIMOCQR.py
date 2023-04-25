@@ -159,7 +159,7 @@ class AEnbMIMOCQR:
         self.last_H_ensemble_forecasts = [ensemble_forecast_lower - self.qhat, ensemble_forecast_upper + self.qhat]
         self.counter+=1
 
-        # H-step ahead prediction intervals to return
+        # return H-step ahead prediction intervals
         r = []
         for i in range(self.H):
             r.append([ensemble_forecast_lower[i] - self.qhat[i], ensemble_forecast_upper[i] + self.qhat[i]])
@@ -179,10 +179,10 @@ class AEnbMIMOCQR:
 
             if ground_truth[i] > self.last_H_ensemble_forecasts[0][i] and ground_truth[i] <  self.last_H_ensemble_forecasts[1][i]:
                 
-                self.alpha[i] = min(0,max(self.alpha[i] + self.gamma * self.desired_alpha,1))
+                self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * self.desired_alpha,1))
             
             else: 
-                self.alpha[i] = min(0,max(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
+                self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
         
         self.residuals.append(new_non_conformity_scores)
         del self.residuals[0]

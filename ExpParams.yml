@@ -2,7 +2,7 @@ B: 1
 lags: 40
 H: 30
 phi: mean
-T: 100
+T: 10
 alpha : 0.1
 n_test: 390
-epochs: 1
+epochs: 10

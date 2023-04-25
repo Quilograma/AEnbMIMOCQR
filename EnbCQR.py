@@ -117,7 +117,8 @@ class EnbCQR:
         
         # list of H ensemble forecasts
         ensemble_PIs_list = []
-
+        self.last_H_ensemble_forecasts = []
+        
         # Deliver multi-step ahead prediction intervals
         for i in range(self.H):
 
@@ -166,7 +167,6 @@ class EnbCQR:
             del self.residuals[0]
 
         self.counter = 0
-        self.last_H_ensemble_forecasts = []
         self.qhat = np.quantile(self.residuals,1-self.alpha)
 
         #update the X_input

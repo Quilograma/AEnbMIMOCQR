@@ -45,7 +45,7 @@ def PICP(PIs, ground_truth):
     
     Return: PICP score
     """
-    Counter_within_PI = []
+    Counter_within_PI = 0
 
     for i in range(len(PIs)):
         if PIs[i][0] < ground_truth[i] and ground_truth[i] < PIs[i][1]:
@@ -128,8 +128,8 @@ for col in cols:
 
             for j in range(len(forecast)):
                 PIs.append([forecast[j][0] , forecast[j][1]])
-            
-            model.update(ts_test[i:i+30])
+
+            model.update(ts_test[i:i+H])
     
         PINAW_score = PINAW(PIs, np.max(ts_train), np.min(ts_train))
         PICP_score = PICP(PIs, ts_test)

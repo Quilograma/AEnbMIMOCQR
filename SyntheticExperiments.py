@@ -100,28 +100,7 @@ model_enbcqr.fit(X, y, epochs = epochs)
 iou_list = []
 
 
-
-iou_list_aux = []
-for i in range(0,n_test, H):
-    forecast = model_arima.forecast()
-
-    for j in range(len(forecast)):
-        mu = df_test.iloc[i+j]['mean_series']
-        std = df_test.iloc[i+j]['std_series']
-        
-        forecast_lower = forecast[j][0]
-        forecast_upper = forecast[j][1]
-        
-        iou_list_aux.append(compute_iou([forecast_lower, forecast_upper],[mu-inv_cdf*std, mu+inv_cdf*std]))
-    
-    model_arima.update(df_test.iloc[i:i+30]['series'].values)
-
-
-
-iou_list.append(iou_list_aux)
-
-
-for model in [model_mimocqr, model_aenbmimocqr, model_enbpi, model_enbcqr]:
+for model in [model_arima,model_mimocqr, model_aenbmimocqr, model_enbpi, model_enbcqr]:
     iou_list_aux = []
     for i in range(0,n_test, H):
 
@@ -133,8 +112,8 @@ for model in [model_mimocqr, model_aenbmimocqr, model_enbpi, model_enbcqr]:
 
             iou_list_aux.append(compute_iou([forecast[j][0], forecast[j][1]],[mu - inv_cdf*std, mu + inv_cdf*std]))
 
-
-        model.update(df_test.iloc[i:i+30]['series'].values)
+        
+        model.update(df_test.iloc[i:i+H]['series'].values)
     
     iou_list.append(iou_list_aux)
 
