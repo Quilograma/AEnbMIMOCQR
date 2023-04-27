@@ -1,3 +1,5 @@
+![Image](https://github.com/Quilograma/AEnbMIMOCQR/blob/improv/fig.png?raw=true)
+
 # What is this repository about?
 
 This repo contains the code related to the experimental part of the paper *A General framework for multi-step ahead adaptive conformal time series forecasting*. As such, this repo contains five regression algorithms: 
@@ -24,11 +26,9 @@ We compared all algorithms against each other in several datasets presented in t
 | **ARIMA** | ❌ | ❌ | ❌ | ❌ |
 
 # Requirements 
+- Numpy
 - Tensorflow 
 - Keras
-- Numpy
-- Pandas
-- Pmdarima
 
 
 # How to use it
@@ -71,8 +71,14 @@ model_aenbmimocqr.fit(X, y, epochs = epochs)
 
 #Obtain 5-step ahead prediction intervals each with 90% confidence.
 
+print(model_aenbmimocqr.forecast())
+# [[999.10, 1030.65], [1001.88, 1020.29], [1003.76, 1025.24], [1005.21, 1038.56], [1006.78, 1042.39]]
 
+# update with the ground truth values at timestep t + H 
 
+model_aenbmimocqr.update([1001,1002,1003,1004,1005]) # This will change the miscoverage rate alpha and add new-conformity scores while discarding oldest.
+
+# We could now keep repeating this process indefinetely -> model_aenbmimocqr.forecast() -> model_aenbmimocqr.update() (...) -> model_aenbmimocqr.forecast()
 
 
 ```
