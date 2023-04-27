@@ -1,54 +1,62 @@
 import pmdarima as pm
-import pandas as pd
 import numpy as np
 
-class auto_arima:
+
+class ARIMAModel:
+    def __init__(self, time_series, alpha, horizon, p):
+        self.time_series = list(time_series)
+        self.alpha = alpha
+        self.horizon = horizon
+        self.H = horizon
+        self.p = p
+        self.model = None
+
+    def train(self):
+        self.model = pm.auto_arima(self.time_series,
+                                   seasonal=False,
+                                   p=self.p,
+                                   suppress_warnings=True)
+        self.model.fit(self.time_series)
+
+    def forecast(self):
+        if self.model is None:
+            raise Exception('Model not trained')
+
+        # Generate H-step ahead forecast intervals
+        conf_int = self.model.predict(n_periods=self.horizon,
+                                                  return_conf_int=True,
+                                                  alpha=self.alpha)
+
+        # Return confidence intervals
+        return conf_int[1][-self.H:]
     
-    def __init__(self,train,test,timesteps,alpha):
-        self.train=train
-        self.test=test
-        self.timesteps=timesteps
-        self.alpha=alpha
+    def update(self, ground_truth):
+        self.horizon = self.horizon + len(ground_truth)
     
-    def fit(self):
 
-        model = pm.auto_arima(self.train,
-                      m=1,             
-                      d=None,           
-                      seasonal=False,
-                      start_p=self.timesteps,
-                      max_p=self.timesteps,
-                      start_q=self.timesteps,
-                      max_q=self.timesteps,   
-                      start_P=0,
-                      method='nm',
-                      alpha=self.alpha, 
-                      D=None,
-                      max_order =None, 
-                      trace=True,
-                      error_action='ignore', 
-                      suppress_warnings=True, 
-                      stepwise=True)
-        return model
-    def summary_statistics(self,arr):
-    # calculates summary statistics from array
-    
-        return [np.quantile(arr,0.5),np.quantile(arr,0.75)-np.quantile(arr,0.25)]
+if __name__ =='__main__':
 
-    def calculate_metrics(self):
-        model=self.fit()
-        fc, confint = model.predict(n_periods=len(self.test), return_conf_int=True,alpha=self.alpha)
 
-        lower_bound = confint[:, 0].flatten()
-        upper_bound = confint[:, 1].flatten()
+    # Load example time series data
+    data = [2,4,6,8,16,32,64,128,256,512]
 
-        interval_width=np.abs(upper_bound-lower_bound)
-        counter=0
-        coverages=[]
+    # Create ARIMA model with alpha=0.05, horizon=12, and p=2
+    model = ARIMAModel(data, alpha=0.05, horizon=3, p=1)
 
-        for i in range(len(self.test)):
-            if self.test[i] >= lower_bound[i] and self.test[i] <= upper_bound[i]:
-                counter+=1
-            coverages.append(counter/(i+1))
-        
-        return counter/len(self.test),self.summary_statistics(interval_width),coverages
+    # Train the model
+    model.train()
+
+    # Make predictions
+    conf_int = model.forecast()
+
+    # Print corresponding intervals
+    print('Confidence intervals:', conf_int)
+
+    model.update([1024,2048])
+
+
+    # Make predictions
+    conf_int = model.forecast()
+
+    print('Confidence intervals:', conf_int)
+

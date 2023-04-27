@@ -1,290 +1,222 @@
-from logging.handlers import QueueHandler
-from tabnanny import verbose
-from sklearn.utils import resample
+""" 
+	author: Martim Sousa
+	date:    23/03/2023
+    Description: This code is an adaption of EnbCQR
+    for multi-step ahead prediction intervals via
+    the recursive strategy.
+"""
+
+from models import MLPQuantile
 import numpy as np
-from sklearn.neural_network import MLPRegressor
-from keras import Sequential
-from keras.models import Model
-from keras.layers import Dense, Input,Dropout
-import keras.backend as K
-import matplotlib.pyplot as plt
-import seaborn as sns
-plt.rcParams["figure.figsize"] = (15,8)
-plt.rcParams.update({'font.size': 30})
-sns.set_style("darkgrid", {'axes.grid' : True})
-
-#quantile loss function
-
-def tilted_loss(q,y,f):
-    # q: Quantile to be evaluated, e.g., 0.5 for median.
-    # y: True value.
-    # f: Fitted (predicted) value.
-    e = (y-f)
-    return K.mean(K.maximum(q*e, (q-1)*e), axis=-1)
-
-# Feedforward neural network QR architecture
-
-def QuantileRegressionModel(n_in,n_out,qs=[0.1, 0.5, 0.9]):
-    ipt_layer = Input((n_in,))
-    layer1 = Dense(100, activation='relu')(ipt_layer)
-    drop1=Dropout(0.1)(layer1)
-    layer2 = Dense(100, activation='relu')(drop1)
-    drop2=Dropout(0.1)(layer2)
-    
-    out1 = Dense(n_out, name='out1')(drop2)
-    out2 = Dense(n_out, name='out2')(drop2)
-    out3 = Dense(n_out, name='out3')(drop2)
-    
-    q1, q2, q3 = qs
-    model = Model(inputs=ipt_layer, outputs=[out1, out2, out3])
-    model.compile(loss={'out1': lambda y,f: tilted_loss(q1,y,f),
-                        'out2': lambda y,f: tilted_loss(q2,y,f),
-                        'out3': lambda y,f: tilted_loss(q3,y,f),}, 
-                  loss_weights={'out1': 1, 'out2': 1, 'out3': 1},
-                 optimizer='adam')
-    
-    return model
-
-
+from utils import to_supervised
 
 class AEnbMIMOCQR:
 
-
-    models_list=[] # list to store B bootstrap models
-    residuals_list=[] # list to store non-conformity scores
-    S_b_list=[]
+    models = [] # list of models
+    residuals = [] # non-conformity set
+    S_b_list = [] # list of bootstrap indexes 
+    last_H_ensemble_forecasts = [] # list to store the lastest H-th forecasts
+    counter = 0 # counter to know when the residuals should be updated
+    qhat = [] # empirical quantile
+    X_input = [] # current input to be used to make predictions
+    gamma = 0 # learning rate of ACI 
     
 
-    def __init__(self,X_train,y_train,X_val,y_val,B,alpha,phi,epochs,batch_size,N):
-        self.X_train=X_train
-        self.y_train=y_train
-        self.X_val=X_val
-        self.y_val=y_val
-        self.alpha=alpha
-        self.alpha_list=np.repeat(alpha,y_train.shape[1])
-        self.B=B
-        self.epochs=epochs
-        self.batch_size=batch_size
-        self.phi=phi
-        self.K=N
+    def __init__(self, B, alpha, phi, H, T = 0) -> None:
+
+        # B: Number of bootstrap models
+        # alpha: miscoverage rate
+        # phi: aggregation function, only mean or median available
+        # H: forecast horizon dimension
+        # T: optional sampling of the non-conformity scores
+
+        if not isinstance(B, int):
+            raise TypeError("Value must be an integer")
         
-    
-    
+        self.B = B
 
+        if not isinstance(H, int):
+            raise TypeError("H must be an integer")
+        
+        self.H = H
+        
+        if alpha < 0 or alpha >1:
+            raise ValueError('alpha must be between 0 and 1')
+        
+        self.alpha = []
 
+        for i in range(self.H):
+            self.alpha.append(alpha)
 
-    def Bootstrap_fit(self):
-        N=self.X_train.shape[0]
+        self.desired_alpha = alpha
 
+        if phi not in ['mean','median']:
+
+            raise ValueError("Value must be 'mean' or 'median'")
+        
+        self.phi = phi
+        
+        if not isinstance(T, int):
+            raise TypeError("T must be an integer")
+
+        self.T = T
+
+    def fit(self, X_train, y_train, epochs):
+        
+
+        # Train b models in bootstrap datasets (bagging)
         for i in range(self.B):
-            S_b=np.random.choice(N,N)
-            X_train_resampled,y_train_resampled=self.X_train[S_b],self.y_train[S_b]
-            model = QuantileRegressionModel(self.X_train.shape[1],self.y_train.shape[1],qs=[self.alpha/2, 0.5,1-self.alpha/2])
-            model.fit(X_train_resampled,y_train_resampled,epochs=self.epochs,verbose=0,batch_size=self.batch_size)
-            self.S_b_list.append(S_b)
-            self.models_list.append(model)
+
+            # get bootstrap indexes
+            S_b = np.random.choice(X_train.shape[0], X_train.shape[0], replace=True)
             
-        return self.models_list
+            #Initialize the model with approriate input dim
+            model = MLPQuantile(X_train.shape[1], y_train.shape[1],  quantiles=[self.alpha[0]/2, 0.5, 1-self.alpha[0]/2])
 
-    def LOO_errors(self):
+            #fit the model on bootstrap datasets
+            model.fit(X_train[S_b], y_train[S_b], epochs=epochs, verbose = 0)
 
-        self.Bootstrap_fit()
-
-        for i in range(self.X_train.shape[0]):
-            forecast_lower=[]
-            forecast_upper=[]
-            counter=0
+            #apppend the model to the list and the bootstrap indexes
+            self.models.append(model)
+            self.S_b_list.append(S_b)
+        
+        # Compute in-sample out-of-bag non-conformity scores
+        for i in range(X_train.shape[0]):
+            # list to know which models incorporate the ensemble
+            ensemble_list = []
 
             for j in range(self.B):
+                #incorporate model if it did not use observation i for training
                 if i not in self.S_b_list[j]:
-                    counter+=1
-                    aux=self.models_list[j].predict(self.X_train[i].reshape(1, -1))
-                    f_l=aux[0].flatten()
-                    f_u=aux[2].flatten()
-                    forecast_lower.append(f_l)
-                    forecast_upper.append(f_u)
-
-            actual_values=self.y_train[i]
-            forecast_lower=np.array(forecast_lower)
-            forecast_upper=np.array(forecast_upper)
-
-            if counter >0:
-                aux=[]
-                for j in range(len(actual_values)):
-
-                    aux.append(max(self.phi(forecast_lower[:,j])-actual_values[j],actual_values[j]-self.phi(forecast_upper[:,j])))
-                
-                self.residuals_list.append(aux)
-
-
-        return self.residuals_list
-
-    def create_conf_intervals_adaptive(self):
-        self.LOO_errors()
-
-
-        ncols=self.y_val.shape[1]
-
-        q_yhats=np.zeros(ncols)
-
-        N=len(self.residuals_list)
-        idx=np.random.choice(N, min(N,self.K),replace=False)
-        self.residuals_list=np.array(self.residuals_list)[idx]
-        self.residuals_list=list(self.residuals_list)
-        N=len(self.residuals_list)
-        self.gamma=1/N
-        #N=100
-
-        for j in range(ncols):
-            q_yhats[j]=np.quantile(np.array(self.residuals_list)[:,j],(np.ceil(N+1)*(1-self.alpha_list[j]))/N)
-        
-        
-
-        #adaptive part
-        lower_bounds=[]
-        upper_bounds=[]
-
-        last_H_errors=[]
-        last_H_cov=[]
-
-
-        for i in range(self.X_val.shape[0]):
-
-            X_input=self.X_val[i].reshape(1,-1)
-            forecast_lower=[]
-            forecast_upper=[]
-
-            for k in range(len(self.models_list)):
-                aux=self.models_list[k].predict(X_input)
-                lb=aux[0].flatten()
-                ub=aux[2].flatten()
-                forecast_lower.append(lb)
-                forecast_upper.append(ub)
+                    ensemble_list.append(j)
             
-            forecast_lower=np.array(forecast_lower)
-            forecast_upper=np.array(forecast_upper)
-            upper_bound=np.zeros(ncols)
-            lower_bound=np.zeros(ncols)
+            #if there is at least one model which did not i for training
+            # produce a prediction and store the associated non-conformity score
 
-            for  j in range(ncols):
-                lower_bound[j]=self.phi(forecast_lower[:,j])
-                upper_bound[j]=self.phi(forecast_upper[:,j])
-            
-            aux=[]
-            aux2=[]
+            if len(ensemble_list)>0:
+                # list of forecasts
+                yhat_list_upper = []
+                yhat_list_lower = []
 
-            for j in range(ncols):
-                l=lower_bound[j]-q_yhats[j]
-                u=upper_bound[j]+q_yhats[j]
-
-                if self.y_val[i][j]<u and self.y_val[i][j]>l:
-                    aux2.append(1)
-                else:
-                    aux2.append(0)
-
-                aux.append(max(l-self.y_val[i][j],self.y_val[i][j]-u))
-            
-            last_H_errors.append(aux)
-            last_H_cov.append(aux2)
-            
-            aux1=[]
-            aux2=[]
-
-            for j in range(ncols):
-                aux1.append(lower_bound[j]-q_yhats[j])
-                aux2.append(upper_bound[j]+q_yhats[j])
-            
-            lower_bounds.append(aux1)
-            upper_bounds.append(aux2)
-            
-            if (i+1)%ncols==0:
-                for j in range(ncols):
-                    del self.residuals_list[0]
-                    self.residuals_list.append(last_H_errors[j])
-
-                    aux=np.array(last_H_cov)[:,j]
-                    for i in range(len(aux)):
-                        if aux[i]==1:
-                            self.alpha_list[j]=self.alpha_list[j]+self.gamma*(self.alpha_list[j])
-                        else:
-                            self.alpha_list[j]=self.alpha_list[j]+self.gamma*(self.alpha_list[j]-1)
-                    q=((np.ceil(N+1)*(1-self.alpha_list[j]))/N)
-                    q=max(0,min(q,1))
-                    q_yhats[j]=np.quantile(np.array(self.residuals_list)[:,j],q) 
-               # print(self.alpha_list)            
-                last_H_cov=[]
-                last_H_errors=[]        
-                
-        return self.y_val,np.array(lower_bounds),np.array(upper_bounds)
-            
-
-
-    def calculate_qyhat_multi(self):
-        model=self.fit()
-        aux=model.predict(self.X_cal)
-        forecast_lb=aux[0]
-        forecast_ub=aux[2]
-
-        nrows=forecast_lb.shape[0]
-
-        ncols=forecast_lb.shape[1]
-        
-        scores=np.zeros((nrows,ncols))
-        q_yhats=np.zeros(ncols)
-        
-        for i in range(nrows):
-            for j in range(ncols):
-                
-                scores[i][j]=np.max([forecast_lb[i][j]-self.y_cal[i][j],self.y_cal[i][j]-forecast_ub[i][j]])
-        
-        for j in range(ncols):
-            q_yhats[j]=np.quantile(scores[:,j],np.ceil((nrows+1)*(1-self.alpha))/nrows)
-
-        return model,q_yhats
-    
-    def create_conf_intervals(self):
-        model,q_yhats=self.calculate_qyhat_multi()
-        aux=model.predict(self.X_val)
-        forecast_lb=aux[0]
-        forecast_ub=aux[2]
-
-        nrows=forecast_lb.shape[0]
-        ncols=forecast_lb.shape[1]
-        
-        lower_bounds=np.zeros((nrows,ncols))
-        upper_bounds=np.zeros((nrows,ncols))
-        
-        for i in range(nrows):
-            for j in range(ncols):
-                lower_bounds[i][j]=forecast_lb[i][j]-q_yhats[j]
-                upper_bounds[i][j]=forecast_ub[i][j]+q_yhats[j]
-        
-        return lower_bounds,upper_bounds 
-
-    
-    def summary_statistics(self,arr):
-        # calculates summary statistics from array
-    
-        return [np.median(arr),np.quantile(arr,0.75)-np.quantile(arr,0.25)]
-              
-    def calculate_coverage(self):
-        y_true,lower_bounds,upper_bounds= self.create_conf_intervals_adaptive()
-        interval_sizes=np.abs((upper_bounds-lower_bounds)).flatten()
-        counter=0
-        counter_per_horizon=np.zeros(y_true.shape[1])
-        coverages=[]
-
-        for i in range(y_true.shape[0]):
-            for j in range(y_true.shape[1]):
-                if lower_bounds[i][j] < y_true[i][j] and y_true[i][j] < upper_bounds[i][j]:
-                    counter+=1
-                    counter_per_horizon[j]+=1
-            coverages.append(counter/((i+1)*(j+1)))
-
-        #plt.plot(coverages)
-        #plt.xlabel('t')
-        #plt.ylabel('Coverage')
-        #plt.show()
-        
+                for k in ensemble_list:
                     
-        return counter/(y_true.shape[0]*y_true.shape[1]),counter_per_horizon/y_true.shape[0],self.summary_statistics(interval_sizes),coverages
+
+                    yhat_list_lower.append(self.models[k].predict(X_train[i].reshape(1,-1))[0].flatten())
+                    yhat_list_upper.append(self.models[k].predict(X_train[i].reshape(1,-1))[2].flatten())
+
+
+                if self.phi == 'mean':
+                    ensemble_forecast_lower = np.mean(np.array(yhat_list_lower), axis=0)
+                    ensemble_forecast_upper = np.mean(np.array(yhat_list_upper), axis=0)
+                else:
+                    ensemble_forecast_lower = np.median(np.array(yhat_list_lower), axis=0)
+                    ensemble_forecast_upper = np.median(np.array(yhat_list_upper), axis=0)
+
+                non_conformity_score = np.maximum(ensemble_forecast_lower - y_train[i], y_train[i]- ensemble_forecast_upper)
+                
+                self.residuals.append(non_conformity_score)
+        
+        #compute empirical quantile
+
+        self.qhat = np.zeros(self.H)
+
+        for h in range(self.H):
+            self.qhat[h] = np.quantile(np.array(self.residuals)[:,h], 1-self.alpha[h])    
+        
+
+        aux = list(X_train[-1]) + list(y_train[-1])
+        self.X_input = aux[-X_train.shape[1]:]
+
+
+        # non-conformity score sampling
+        if self.T !=0 and self.T < len(self.residuals):
+            indices_aux = np.random.choice(len(self.residuals), self.T, replace = False)
+            self.residuals = list(np.array(self.residuals)[indices_aux])
+        self.gamma = 1/len(self.residuals)
+
+
+    def forecast(self):
+
+        if self.counter == 1:
+            raise Exception('Please, update with the new ground truth values before proceeding!')
+        
+        # list of H ensemble forecasts
+
+        yhat_list_lower = []
+        yhat_list_upper = []
+
+        for model in self.models:
+            yhat_list_lower.append(model.predict(np.array(self.X_input).reshape(1,-1))[0].flatten())
+            yhat_list_upper.append(model.predict(np.array(self.X_input).reshape(1,-1))[2].flatten())
+
+        if self.phi == 'mean':
+            ensemble_forecast_lower = np.mean(np.array(yhat_list_lower), axis=0)
+            ensemble_forecast_upper = np.mean(np.array(yhat_list_upper), axis=0)
+        else:
+            ensemble_forecast_lower = np.median(np.array(yhat_list_lower), axis=0)
+            ensemble_forecast_upper = np.median(np.array(yhat_list_upper), axis=0)
+
+        self.last_H_ensemble_forecasts = [ensemble_forecast_lower - self.qhat, ensemble_forecast_upper + self.qhat]
+        self.counter+=1
+
+        # return H-step ahead prediction intervals
+        r = []
+        for i in range(self.H):
+            r.append([ensemble_forecast_lower[i] - self.qhat[i], ensemble_forecast_upper[i] + self.qhat[i]])
+
+
+        return r
+    
+    #update the non-conformity score set with new scores 
+    def update(self,ground_truth):
+        assert len(ground_truth) == len(self.last_H_ensemble_forecasts[0])
+
+        new_non_conformity_scores = []
+
+        for i in range(len(ground_truth)):
+            non_conformity_score = max(self.last_H_ensemble_forecasts[0][i] - ground_truth[i], ground_truth[i]- self.last_H_ensemble_forecasts[1][i])
+            new_non_conformity_scores.append(non_conformity_score)
+
+            if ground_truth[i] > self.last_H_ensemble_forecasts[0][i] and ground_truth[i] <  self.last_H_ensemble_forecasts[1][i]:
+                
+                self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * self.desired_alpha,1))
+            
+            else: 
+                self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
+        
+        self.residuals.append(new_non_conformity_scores)
+        del self.residuals[0]
+        
+
+        self.counter = 0
+        self.last_H_ensemble_forecasts = []
+        
+        for h in range(self.H):
+            self.qhat[h] = np.quantile(np.array(self.residuals)[:,h], 1-self.alpha[h]) 
+
+        
+        #update the X_input
+        if len(self.X_input) > len(ground_truth):
+            self.X_input = self.X_input[len(ground_truth)-len(self.X_input):] + list(ground_truth)
+        else:
+            self.X_input = ground_truth[-len(self.X_input):]    
+
+if __name__ == '__main__':
+
+    ts = [i for i in range(100)]
+
+    X, y = to_supervised(ts, 5, 2)
+
+    model_enbcqr = AEnbMIMOCQR(3, 0.1,'mean',2, 100)
+    
+    model_enbcqr.fit(X, y, 100)
+    
+    for j in range(100):
+
+        if j % model_enbcqr.H == 0 and j >0:
+            print('ITERAÇÃO {}'.format(j))
+            print(model_enbcqr.forecast())
+            print(model_enbcqr.X_input)
+            model_enbcqr.update([100+j-1, 100 + j])
+            print(model_enbcqr.X_input)
+            print('Updated',len(model_enbcqr.residuals), model_enbcqr.qhat)  
