@@ -131,6 +131,8 @@ class AEnbMIMOCQR:
         if self.T !=0 and self.T < len(self.residuals):
             indices_aux = np.random.choice(len(self.residuals), self.T, replace = False)
             self.residuals = list(np.array(self.residuals)[indices_aux])
+        
+
         self.gamma = 1/len(self.residuals)
 
 

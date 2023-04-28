@@ -151,4 +151,4 @@ print(df_pinaw.to_latex())
 d_picp = {'ARIMA': [model_picp_global_scores[0]], 'MIMOCQR': [model_picp_global_scores[1]], 'AEnbMIMOCQR' : [model_picp_global_scores[2]], 'EnbPI': [model_picp_global_scores[3]], 'EnbCQR': [model_picp_global_scores[4]]}
 df_picp = pd.DataFrame(d_picp)
 
-print(df_pinaw.to_latex())
+print(df_picp.to_latex())
