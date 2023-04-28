@@ -184,9 +184,11 @@ class AEnbMIMOCQR:
             else: 
                 self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
         
-        self.residuals.append(new_non_conformity_scores)
-        del self.residuals[0]
-        
+
+        for i in range(self.H):
+            self.residuals.append(new_non_conformity_scores)
+            del self.residuals[0]
+            
 
         self.counter = 0
         self.last_H_ensemble_forecasts = []
@@ -201,22 +203,4 @@ class AEnbMIMOCQR:
         else:
             self.X_input = ground_truth[-len(self.X_input):]    
 
-if __name__ == '__main__':
 
-    ts = [i for i in range(100)]
-
-    X, y = to_supervised(ts, 5, 2)
-
-    model_enbcqr = AEnbMIMOCQR(3, 0.1,'mean',2, 100)
-    
-    model_enbcqr.fit(X, y, 100)
-    
-    for j in range(100):
-
-        if j % model_enbcqr.H == 0 and j >0:
-            print('ITERAÇÃO {}'.format(j))
-            print(model_enbcqr.forecast())
-            print(model_enbcqr.X_input)
-            model_enbcqr.update([100+j-1, 100 + j])
-            print(model_enbcqr.X_input)
-            print('Updated',len(model_enbcqr.residuals), model_enbcqr.qhat)  
