@@ -113,7 +113,6 @@ class AEnbMIMOCQR:
                     ensemble_forecast_upper = np.median(np.array(yhat_list_upper), axis=0)
 
                 non_conformity_score = np.maximum(ensemble_forecast_lower - y_train[i], y_train[i]- ensemble_forecast_upper)
-                
                 self.residuals.append(non_conformity_score)
         
         #compute empirical quantile
@@ -178,11 +177,13 @@ class AEnbMIMOCQR:
             new_non_conformity_scores.append(non_conformity_score)
 
             if ground_truth[i] > self.last_H_ensemble_forecasts[0][i] and ground_truth[i] <  self.last_H_ensemble_forecasts[1][i]:
-                
-                self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * self.desired_alpha,1))
+
+                for j in range(self.H):
+                    self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * self.desired_alpha,1))
             
             else: 
-                self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
+                for j in range(self.H):
+                    self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
         
 
         for i in range(self.H):
@@ -198,9 +199,7 @@ class AEnbMIMOCQR:
 
         
         #update the X_input
-        if len(self.X_input) > len(ground_truth):
-            self.X_input = self.X_input[len(ground_truth)-len(self.X_input):] + list(ground_truth)
-        else:
-            self.X_input = ground_truth[-len(self.X_input):]    
+        aux = list(self.X_input) + list(ground_truth)
+        self.X_input = aux[-len(self.X_input):]
 
 

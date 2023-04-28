@@ -170,10 +170,8 @@ class EnbCQR:
         self.qhat = np.quantile(self.residuals,1-self.alpha)
 
         #update the X_input
-        if len(self.X_input) > len(ground_truth):
-            self.X_input = self.X_input[len(ground_truth)-len(self.X_input):] + list(ground_truth)
-        else:
-            self.X_input = ground_truth[-len(self.X_input):]    
+        aux = list(self.X_input) + list(ground_truth)
+        self.X_input = aux[-len(self.X_input):] 
 
 
 if __name__ == '__main__':

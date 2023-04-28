@@ -66,7 +66,7 @@ epochs = d_params['epochs']
 inv_cdf = norm.ppf(1-alpha/2)
 
 # read the dataset
-df = pd.read_csv("SyntheticDataset.csv")
+df = pd.read_csv("SD.csv")
 
 
 # extract train and test datasets
@@ -102,7 +102,7 @@ model_enbcqr.fit(X, y, epochs = epochs)
 iou_list = []
 
 
-for model in [model_mimocqr, model_aenbmimocqr, model_enbpi, model_enbcqr]:
+for model in [model_mimocqr, model_aenbmimocqr]:
     iou_list_aux = []
     for i in range(0,n_test, H):
 
