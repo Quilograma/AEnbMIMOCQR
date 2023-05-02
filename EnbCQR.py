@@ -89,8 +89,8 @@ class EnbCQR:
 
                 for k in ensemble_list:
 
-                    yhat_list_lower.append(self.models[k].predict(X_train[i].reshape(1,-1))[0][0][0])
-                    yhat_list_upper.append(self.models[k].predict(X_train[i].reshape(1,-1))[2][0][0])
+                    yhat_list_lower.append(self.models[k].predict(X_train[i].reshape(1,-1), verbose = 0)[0][0][0])
+                    yhat_list_upper.append(self.models[k].predict(X_train[i].reshape(1,-1), verbose = 0)[2][0][0])
 
 
                 if self.phi == 'mean':
@@ -128,9 +128,9 @@ class EnbCQR:
             yhat_list_upper = []
 
             for model in self.models:
-                yhat_list_lower.append(model.predict(np.array(self.X_input).reshape(1,-1))[0][0][0])
-                yhat_list.append(model.predict(np.array(self.X_input).reshape(1,-1))[1][0][0])
-                yhat_list_upper.append(model.predict(np.array(self.X_input).reshape(1,-1))[2][0][0])
+                yhat_list_lower.append(model.predict(np.array(self.X_input).reshape(1,-1), verbose = 0)[0][0][0])
+                yhat_list.append(model.predict(np.array(self.X_input).reshape(1,-1), verbose = 0)[1][0][0])
+                yhat_list_upper.append(model.predict(np.array(self.X_input).reshape(1,-1), verbose = 0)[2][0][0])
 
             if self.phi == 'mean':
                 ensemble_forecast_lower = np.mean(yhat_list_lower)

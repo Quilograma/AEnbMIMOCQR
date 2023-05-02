@@ -1,8 +1,8 @@
-B: 10
-lags: 30
-H: 30
+B: 1
+lags: 3
+H: 2
 phi: mean
 T: 100
 alpha : 0.1
-n_test: 300
+n_test: 390
 epochs: 1

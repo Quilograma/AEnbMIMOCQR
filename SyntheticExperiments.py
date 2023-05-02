@@ -77,7 +77,7 @@ df_test = df[-n_test:]
 
 # Train ARIMA
 model_arima = ARIMAModel(df_train['series'].values, alpha, H, lags)
-#model_arima.train()
+model_arima.train()
 
 
 # Convert train time series to MIMO supervised structure
@@ -102,7 +102,7 @@ model_enbcqr.fit(X, y, epochs = epochs)
 iou_list = []
 
 
-for model in [model_mimocqr, model_aenbmimocqr]:
+for model in [model_arima, model_mimocqr, model_aenbmimocqr, model_enbpi, model_enbcqr]:
     iou_list_aux = []
     for i in range(0,n_test, H):
 

@@ -15,7 +15,15 @@ from MIMOCQR import MIMOCQR
 from EnbPI import EnbPI
 from EnbCQR import EnbCQR
 from AutoArima import ARIMAModel
-from scipy.stats import norm
+import json
+import logging
+
+
+logging.basicConfig(
+    filename='my_log_file.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 #Function to compute the predition interval normalized average width (PINAW)
 def PINAW(PIs, y_max, y_min):
@@ -136,9 +144,16 @@ for col in cols:
 
         model_pinaw_scores.append(PINAW_score)
         model_picp_scores.append(PICP_score)
+    
+    logging.info(f"Series {col} PINAW: {model_pinaw_scores}")
+    logging.info(f"Series {col} PICP: {model_picp_scores}")
 
     model_pinaw_global_scores.append(model_pinaw_scores)
     model_picp_global_scores.append(model_picp_scores)
+
+with open('results.json', 'w') as f:
+    json.dump(model_pinaw_global_scores, f)
+    json.dump(model_picp_global_scores, f)
 
 model_pinaw_global_scores = np.mean(np.array(model_pinaw_global_scores), axis = 0)
 model_picp_global_scores = np.mean(np.array(model_picp_global_scores), axis = 0) 

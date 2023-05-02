@@ -17,7 +17,7 @@ We compared all algorithms against each other in several datasets presented in t
 
 # Algorithms overview
 
-| Model | Distribution-free | Heteroscedastic | Adaptive | No error propagation |
+| Model | Distribution-free | Heteroscedastic | Adaptive | Multi-output |
 | --- | --- | --- | --- | --- |
 | **AEnbMIMOCQR** | ✔️ | ✔️ | ✔️ | ✔️ |
 | **MIMOCQR** | ✔️ | ✔️ | ❌ | ✔️ |

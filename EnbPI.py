@@ -89,7 +89,7 @@ class EnbPI:
                 yhat_list = []
 
                 for k in ensemble_list:
-                    yhat_list.append(self.models[k].predict(X_train[i].reshape(1,-1))[0][0])
+                    yhat_list.append(self.models[k].predict(X_train[i].reshape(1,-1), verbose = 0)[0][0])
 
                 if self.phi == 'mean':
                     ensemble_forecast = np.mean(yhat_list)
@@ -120,7 +120,7 @@ class EnbPI:
             yhat_list = []
 
             for model in self.models:
-                yhat_list.append(model.predict(np.array(self.X_input).reshape(1,-1))[0][0])
+                yhat_list.append(model.predict(np.array(self.X_input).reshape(1,-1), verbose = 0)[0][0])
 
             if self.phi == 'mean':
                 ensemble_forecast = np.mean(yhat_list)
