@@ -138,7 +138,7 @@ class EnbPI:
 
     #update the non-conformity score set with new scores 
     def update(self,ground_truth):
-        assert len(ground_truth) == len(self.last_H_ensemble_forecasts)
+        assert len(ground_truth) == self.H
 
         new_non_conformity_scores = np.abs(np.array(ground_truth)-np.array(self.last_H_ensemble_forecasts))
 

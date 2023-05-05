@@ -29,7 +29,7 @@ We compared all algorithms against each other in several datasets presented in t
 - Numpy
 - Tensorflow 
 - Keras
-
+- sklearn
 
 # How to use it
 

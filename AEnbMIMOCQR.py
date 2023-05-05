@@ -170,22 +170,18 @@ class AEnbMIMOCQR:
     
     #update the non-conformity score set with new scores 
     def update(self,ground_truth):
-        assert len(ground_truth) == len(self.last_H_ensemble_forecasts[0])
+        assert len(ground_truth) == self.H
 
-        new_non_conformity_scores = []
+        new_non_conformity_scores =  np.maximum(self.last_H_ensemble_forecasts[0] - ground_truth, ground_truth - self.last_H_ensemble_forecasts[1])
 
         for i in range(len(ground_truth)):
-            non_conformity_score = max(self.last_H_ensemble_forecasts[0][i] - ground_truth[i], ground_truth[i]- self.last_H_ensemble_forecasts[1][i])
-            new_non_conformity_scores.append(non_conformity_score)
 
             if ground_truth[i] > self.last_H_ensemble_forecasts[0][i] and ground_truth[i] <  self.last_H_ensemble_forecasts[1][i]:
 
-                for j in range(self.H):
-                    self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * self.desired_alpha,1))
+                self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * self.desired_alpha,1))
             
             else: 
-                for j in range(self.H):
-                    self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
+                self.alpha[i] = max(0,min(self.alpha[i] + self.gamma * (self.desired_alpha-1),1))
         
 
         for i in range(self.H):
@@ -203,5 +199,23 @@ class AEnbMIMOCQR:
         #update the X_input
         aux = list(self.X_input) + list(ground_truth)
         self.X_input = aux[-len(self.X_input):]
+
+
+if __name__ == '__main__':
+
+    ts = [i for i in range(100)]
+
+    X, y = to_supervised(ts, 1, 2)
+
+    model_enbcqr = AEnbMIMOCQR(3, 0.1, 'mean',2, 30)
+    
+    model_enbcqr.fit(X, y, 100)
+    
+    for j in range(100):
+
+        if j % model_enbcqr.H == 0 and j >0:
+            print('ITERAÇÃO {}'.format(j))
+            model_enbcqr.forecast()
+            model_enbcqr.update([100+j-1, 100 + j]) 
 
 

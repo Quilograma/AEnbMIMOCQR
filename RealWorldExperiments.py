@@ -17,7 +17,7 @@ from EnbCQR import EnbCQR
 from AutoArima import ARIMAModel
 import json
 import logging
-
+import time
 
 logging.basicConfig(
     filename='my_log_file.log',
@@ -79,6 +79,7 @@ T = d_params['T']
 n_test = d_params['n_test']
 alpha = d_params['alpha']
 epochs = d_params['epochs']
+perc_cal = d_params['perc_cal']
 
 
 
@@ -102,8 +103,10 @@ for col in cols:
 
 
     # Train ARIMA
+    
     model_arima = ARIMAModel(ts_train, alpha, H, lags)
     model_arima.train()
+    
 
 
     # Convert train time series to MIMO supervised structure
@@ -112,7 +115,7 @@ for col in cols:
     # fit AEnbMIMOCQR and MIMOCQR
     model_aenbmimocqr = AEnbMIMOCQR(B ,alpha, phi, H, T)
     model_aenbmimocqr.fit(X, y, epochs = epochs)
-    model_mimocqr = MIMOCQR(B ,alpha, phi, H)
+    model_mimocqr = MIMOCQR(alpha, perc_cal, H)
     model_mimocqr.fit(X, y, epochs = epochs)
 
     # Convert train time series to recursive supervised structure
@@ -129,6 +132,7 @@ for col in cols:
     model_picp_scores = []
 
     for model in [model_arima, model_mimocqr, model_aenbmimocqr, model_enbpi, model_enbcqr]:
+
         PIs = []
         for i in range(0,n_test, H):
 
@@ -138,7 +142,7 @@ for col in cols:
                 PIs.append([forecast[j][0] , forecast[j][1]])
 
             model.update(ts_test[i:i+H])
-    
+        
         PINAW_score = PINAW(PIs, np.max(ts_train), np.min(ts_train))
         PICP_score = PICP(PIs, ts_test)
 
